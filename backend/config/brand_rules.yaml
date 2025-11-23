@@ -1,0 +1,11 @@
+# Brand Rules Configuration for Email QA Agentic Platform
+
+font_family: "Arial"
+cta_color: "#0085FF"
+header_logo: "brandlogo.png"
+
+spacing:
+  top_padding: "24px"
+  bottom_padding: "24px"
+
+# Additional brand guidelines can be added here
