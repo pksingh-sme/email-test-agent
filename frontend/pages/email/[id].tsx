@@ -25,17 +25,19 @@ interface AgentAnalysis {
   overall_status: string;
   risk_score: number;
   risk_level: string;
-  compliance_analysis: {
-    issues: Array<{ rule: string; description: string; severity: string }>;
+  deterministic_tests: TestResult[];
+  agentic_analysis: {
+    compliance_analysis: {
+      issues: Array<{ rule: string; description: string; severity: string }>;
+    };
+    tone_analysis: {
+      issues: Array<{ rule: string; description: string; severity: string }>;
+    };
+    accessibility_analysis: {
+      issues: Array<{ rule: string; description: string; severity: string }>;
+    };
+    fix_suggestions: Array<{ type: string; issue: string; description: string; suggestion: string; priority: string }>;
   };
-  tone_analysis: {
-    issues: Array<{ rule: string; description: string; severity: string }>;
-  };
-  accessibility_analysis: {
-    issues: Array<{ rule: string; description: string; severity: string }>;
-  };
-  deterministic_results: TestResult[];
-  fix_suggestions: Array<{ type: string; issue: string; description: string; suggestion: string; priority: string }>;
 }
 
 export default function EmailDetail() {
@@ -79,31 +81,33 @@ export default function EmailDetail() {
         overall_status: 'needs_review',
         risk_score: 65,
         risk_level: 'medium',
-        compliance_analysis: {
-          issues: [
-            { rule: 'font_compliance', description: 'Font does not match brand guidelines', severity: 'medium' },
-            { rule: 'cta_color_compliance', description: 'CTA button color does not match brand guidelines', severity: 'medium' }
-          ]
-        },
-        tone_analysis: {
-          issues: [
-            { rule: 'clarity', description: 'Text contains excessive passive voice constructions', severity: 'low' }
-          ]
-        },
-        accessibility_analysis: {
-          issues: [
-            { rule: 'alt_text_quality', description: 'Image has non-descriptive ALT text: \'Company Logo\'', severity: 'medium' }
-          ]
-        },
-        deterministic_results: [
+        deterministic_tests: [
           { test_name: 'alt_text', status: 'fail', details: 'Image missing descriptive ALT text' },
           { test_name: 'subject_line', status: 'pass', details: 'Subject line present' },
           { test_name: 'preheader', status: 'pass', details: 'Preheader present' }
         ],
-        fix_suggestions: [
-          { type: 'accessibility', issue: 'alt_text_quality', description: 'Image has non-descriptive ALT text', suggestion: 'Improve ALT text descriptiveness: Company Logo', priority: 'medium' },
-          { type: 'compliance', issue: 'font_compliance', description: 'Font does not match brand guidelines', suggestion: 'Update font family to brand standard: Arial', priority: 'medium' }
-        ]
+        agentic_analysis: {
+          compliance_analysis: {
+            issues: [
+              { rule: 'font_compliance', description: 'Font does not match brand guidelines', severity: 'medium' },
+              { rule: 'cta_color_compliance', description: 'CTA button color does not match brand guidelines', severity: 'medium' }
+            ]
+          },
+          tone_analysis: {
+            issues: [
+              { rule: 'clarity', description: 'Text contains excessive passive voice constructions', severity: 'low' }
+            ]
+          },
+          accessibility_analysis: {
+            issues: [
+              { rule: 'alt_text_quality', description: 'Image has non-descriptive ALT text: \'Company Logo\'', severity: 'medium' }
+            ]
+          },
+          fix_suggestions: [
+            { type: 'accessibility', issue: 'alt_text_quality', description: 'Image has non-descriptive ALT text', suggestion: 'Improve ALT text descriptiveness: Company Logo', priority: 'medium' },
+            { type: 'compliance', issue: 'font_compliance', description: 'Font does not match brand guidelines', suggestion: 'Update font family to brand standard: Arial', priority: 'medium' }
+          ]
+        }
       });
     } catch (err) {
       console.error('Failed to fetch analysis', err);
@@ -117,6 +121,7 @@ export default function EmailDetail() {
       setRunningQA(true);
       // In a real implementation, this would call your backend API
       const response = await apiClient.runQA(id as string);
+      // The response contains { report: {...} }, so we need to extract the report
       setAnalysis(response.report);
       
       // Mock delay for demonstration
@@ -271,7 +276,7 @@ export default function EmailDetail() {
                 </div>
                 <div className="border-t border-gray-200">
                   <ul className="divide-y divide-gray-200">
-                    {analysis.deterministic_results.map((test, index) => (
+                    {analysis.deterministic_tests.map((test: TestResult, index: number) => (
                       <li key={index} className="px-4 py-4 sm:px-6">
                         <div className="flex items-center justify-between">
                           <div className="text-sm font-medium text-gray-900">{test.test_name.replace('_', ' ')}</div>
@@ -295,7 +300,7 @@ export default function EmailDetail() {
                 </div>
                 <div className="border-t border-gray-200">
                   <ul className="divide-y divide-gray-200">
-                    {analysis.fix_suggestions.map((fix, index) => (
+                    {analysis.agentic_analysis.fix_suggestions.map((fix: any, index: number) => (
                       <li key={index} className="px-4 py-4 sm:px-6">
                         <div className="flex items-center justify-between">
                           <div className="text-sm font-medium text-gray-900">{fix.issue.replace('_', ' ')}</div>
