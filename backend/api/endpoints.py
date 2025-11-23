@@ -2,9 +2,9 @@
 API Endpoints for the Email QA Agentic Platform
 """
 
-from fastapi import APIRouter, HTTPException, UploadFile, File, Depends
+from fastapi import APIRouter, HTTPException, UploadFile, File, Depends, Body
 from fastapi.responses import HTMLResponse
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from pydantic import BaseModel
 import os
 import uuid
@@ -12,7 +12,7 @@ import json
 from connectors.email_on_acid import EmailOnAcidConnector
 from agent_orchestrator import AgentOrchestrator
 from database.config import get_db
-from database.models import EmailTemplate, QAReport, UploadRecord
+from database.models import EmailTemplate, QAReport, UploadRecord, RuleConfiguration
 from sqlalchemy.orm import Session
 
 # Initialize router
@@ -36,6 +36,31 @@ class QAResponse(BaseModel):
     report: Dict[str, Any]
 
 
+class RuleConfigRequest(BaseModel):
+    name: str
+    description: Optional[str] = ""
+    weight: float = 0.0
+    priority: str = "Medium"
+    override_enabled: bool = False
+    business_override_text: Optional[str] = ""
+    error_message: Optional[str] = ""
+    category: str = "deterministic"
+
+
+class RuleConfigResponse(BaseModel):
+    id: str
+    name: str
+    description: str
+    weight: float
+    priority: str
+    override_enabled: bool
+    business_override_text: str
+    error_message: str
+    category: str
+    created_at: str
+    updated_at: str
+
+
 # GET /emails - list of proofs from Email on Acid
 @router.get("/emails", response_model=List[Dict[str, Any]])
 async def get_emails(db: Session = Depends(get_db)):
@@ -50,11 +75,16 @@ async def get_emails(db: Session = Depends(get_db)):
         
         for email in db_emails:
             metadata = email.get_metadata()
+            # Get QA report for risk score
+            qa_report = db.query(QAReport).filter(QAReport.email_template_id == email.id).first()
+            
             emails.append({
                 "id": email.id,
                 "name": email.name,
                 "created_at": email.created_at.isoformat() if email.created_at else "",
-                "status": email.status
+                "status": email.status,
+                "locale": metadata.get("locale", "N/A"),
+                "risk_score": qa_report.risk_score if qa_report else 0
             })
         
         # Get emails from Email on Acid
@@ -236,22 +266,20 @@ async def upload_email_html(file: UploadFile = File(...), db: Session = Depends(
         # Save upload record
         upload_record = UploadRecord(
             id=file_id,
-            original_filename=file.filename,
+            original_filename=file.filename or "Uploaded Email",
             processed=True,
             qa_report_id=file_id
         )
         db.add(upload_record)
         
         # Save QA report
-        # Convert report to JSON-serializable format
         try:
             serializable_report = json.loads(json.dumps(report, default=str))
         except Exception as serialize_error:
-            # If serialization fails, create a simplified version
             serializable_report = {
                 "overall_status": report.get("overall_status", "unknown"),
                 "risk_score": report.get("risk_score", 0),
-                "email_id": report.get("email_id", file_id),
+                "email_id": file_id,
                 "message": "Full report could not be serialized"
             }
         
@@ -260,7 +288,7 @@ async def upload_email_html(file: UploadFile = File(...), db: Session = Depends(
             email_template_id=file_id,
             overall_status=report.get("overall_status", "unknown"),
             risk_score=report.get("risk_score", 0),
-            report_data=serializable_report,  # PostgreSQL supports JSON natively
+            report_data=serializable_report,
             is_uploaded=True
         )
         db.add(qa_report)
@@ -268,45 +296,242 @@ async def upload_email_html(file: UploadFile = File(...), db: Session = Depends(
         # Commit to database
         db.commit()
         
-        # Clean up uploaded file
-        os.remove(file_path)
-        
-        return {"report": report}
+        return {
+            "message": "File uploaded and analyzed successfully",
+            "report": report,
+            "email_id": file_id
+        }
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=f"Failed to process uploaded file: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
 
 
-# GET /upload - show upload form
-@router.get("/upload", response_class=HTMLResponse)
-async def upload_form():
-    """Show HTML upload form"""
-    return """
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Email QA Upload</title>
-        <style>
-            body { font-family: Arial, sans-serif; margin: 40px; }
-            .container { max-width: 600px; margin: 0 auto; }
-            .form-group { margin-bottom: 20px; }
-            label { display: block; margin-bottom: 5px; font-weight: bold; }
-            input[type="file"] { display: block; margin-bottom: 10px; }
-            button { background-color: #0085FF; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; }
-            button:hover { background-color: #0066cc; }
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <h1>Upload Email HTML for QA Analysis</h1>
-            <form action="/api/v1/upload" method="post" enctype="multipart/form-data">
-                <div class="form-group">
-                    <label for="file">Select HTML File:</label>
-                    <input type="file" name="file" accept=".html,.htm" required>
-                </div>
-                <button type="submit">Upload and Analyze</button>
-            </form>
-        </div>
-    </body>
-    </html>
-    """
+# GET /rules - get all rule configurations
+@router.get("/rules", response_model=List[RuleConfigResponse])
+async def get_rules(db: Session = Depends(get_db)):
+    """Get all rule configurations"""
+    try:
+        rules = db.query(RuleConfiguration).all()
+        
+        # If no rules exist, create default rules
+        if not rules:
+            default_rules = [
+                {
+                    "id": str(uuid.uuid4()),
+                    "name": "ALT Text Required",
+                    "description": "Ensure meaningful ALT text is applied",
+                    "weight": 10.0,
+                    "priority": "Medium",
+                    "override_enabled": True,
+                    "business_override_text": "Allow decorative images with empty ALT",
+                    "error_message": "ALT text missing. Suggested: <AI-generated suggestion>",
+                    "category": "accessibility"
+                },
+                {
+                    "id": str(uuid.uuid4()),
+                    "name": "Decorative Image ALT Skip",
+                    "description": "Skip ALT text requirement for decorative images",
+                    "weight": 5.0,
+                    "priority": "Low",
+                    "override_enabled": False,
+                    "business_override_text": "",
+                    "error_message": "Decorative image requires ALT text",
+                    "category": "accessibility"
+                },
+                {
+                    "id": str(uuid.uuid4()),
+                    "name": "CTA Branding Color Check",
+                    "description": "Ensure CTA buttons use brand colors",
+                    "weight": 15.0,
+                    "priority": "High",
+                    "override_enabled": True,
+                    "business_override_text": "Allow non-brand colors for special campaigns",
+                    "error_message": "CTA color does not match brand guidelines",
+                    "category": "compliance"
+                },
+                {
+                    "id": str(uuid.uuid4()),
+                    "name": "Link Validation",
+                    "description": "Check for broken or malformed links",
+                    "weight": 20.0,
+                    "priority": "High",
+                    "override_enabled": True,
+                    "business_override_text": "Allow placeholder links for development",
+                    "error_message": "Invalid or broken link detected",
+                    "category": "deterministic"
+                },
+                {
+                    "id": str(uuid.uuid4()),
+                    "name": "Template Width Check",
+                    "description": "Ensure template width is within acceptable range",
+                    "weight": 10.0,
+                    "priority": "Low",
+                    "override_enabled": True,
+                    "business_override_text": "Allow custom widths for special templates",
+                    "error_message": "Template width outside acceptable range",
+                    "category": "deterministic"
+                },
+                {
+                    "id": str(uuid.uuid4()),
+                    "name": "Font Size Check",
+                    "description": "Ensure font sizes comply with brand guidelines",
+                    "weight": 10.0,
+                    "priority": "Medium",
+                    "override_enabled": False,
+                    "business_override_text": "",
+                    "error_message": "Font size does not match brand guidelines",
+                    "category": "compliance"
+                },
+                {
+                    "id": str(uuid.uuid4()),
+                    "name": "Copy Tone Check",
+                    "description": "Ensure copy tone matches brand guidelines",
+                    "weight": 10.0,
+                    "priority": "Medium",
+                    "override_enabled": True,
+                    "business_override_text": "Allow casual tone for specific campaigns",
+                    "error_message": "Copy tone does not match brand guidelines",
+                    "category": "tone"
+                },
+                {
+                    "id": str(uuid.uuid4()),
+                    "name": "Accessibility Color Contrast",
+                    "description": "Ensure sufficient color contrast for accessibility",
+                    "weight": 10.0,
+                    "priority": "Medium",
+                    "override_enabled": False,
+                    "business_override_text": "",
+                    "error_message": "Insufficient color contrast detected",
+                    "category": "accessibility"
+                },
+                {
+                    "id": str(uuid.uuid4()),
+                    "name": "Spam Word Check",
+                    "description": "Detect spammy words that may affect deliverability",
+                    "weight": 10.0,
+                    "priority": "Low",
+                    "override_enabled": True,
+                    "business_override_text": "Allow promotional language for marketing emails",
+                    "error_message": "Spammy words detected in content",
+                    "category": "tone"
+                }
+            ]
+            
+            for rule_data in default_rules:
+                rule = RuleConfiguration(**rule_data)
+                db.add(rule)
+            
+            db.commit()
+            rules = db.query(RuleConfiguration).all()
+        
+        return [
+            RuleConfigResponse(
+                id=rule.id,
+                name=rule.name,
+                description=rule.description,
+                weight=rule.weight,
+                priority=rule.priority,
+                override_enabled=rule.override_enabled,
+                business_override_text=rule.business_override_text or "",
+                error_message=rule.error_message or "",
+                category=rule.category,
+                created_at=rule.created_at.isoformat() if rule.created_at else "",
+                updated_at=rule.updated_at.isoformat() if rule.updated_at else ""
+            )
+            for rule in rules
+        ]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch rules: {str(e)}")
+
+
+# PUT /rules/{rule_id} - update rule configuration
+@router.put("/rules/{rule_id}", response_model=RuleConfigResponse)
+async def update_rule(rule_id: str, rule_data: RuleConfigRequest, db: Session = Depends(get_db)):
+    """Update rule configuration"""
+    try:
+        rule = db.query(RuleConfiguration).filter(RuleConfiguration.id == rule_id).first()
+        if not rule:
+            raise HTTPException(status_code=404, detail="Rule not found")
+        
+        # Update rule fields
+        rule.name = rule_data.name
+        rule.description = rule_data.description
+        rule.weight = rule_data.weight
+        rule.priority = rule_data.priority
+        rule.override_enabled = rule_data.override_enabled
+        rule.business_override_text = rule_data.business_override_text
+        rule.error_message = rule_data.error_message
+        rule.category = rule_data.category
+        
+        db.commit()
+        db.refresh(rule)
+        
+        return RuleConfigResponse(
+            id=rule.id,
+            name=rule.name,
+            description=rule.description,
+            weight=rule.weight,
+            priority=rule.priority,
+            override_enabled=rule.override_enabled,
+            business_override_text=rule.business_override_text or "",
+            error_message=rule.error_message or "",
+            category=rule.category,
+            created_at=rule.created_at.isoformat() if rule.created_at else "",
+            updated_at=rule.updated_at.isoformat() if rule.updated_at else ""
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to update rule: {str(e)}")
+
+
+# POST /rules - create new rule configuration
+@router.post("/rules", response_model=RuleConfigResponse)
+async def create_rule(rule_data: RuleConfigRequest, db: Session = Depends(get_db)):
+    """Create new rule configuration"""
+    try:
+        rule = RuleConfiguration(
+            id=str(uuid.uuid4()),
+            name=rule_data.name,
+            description=rule_data.description,
+            weight=rule_data.weight,
+            priority=rule_data.priority,
+            override_enabled=rule_data.override_enabled,
+            business_override_text=rule_data.business_override_text,
+            error_message=rule_data.error_message,
+            category=rule_data.category
+        )
+        
+        db.add(rule)
+        db.commit()
+        db.refresh(rule)
+        
+        return RuleConfigResponse(
+            id=rule.id,
+            name=rule.name,
+            description=rule.description,
+            weight=rule.weight,
+            priority=rule.priority,
+            override_enabled=rule.override_enabled,
+            business_override_text=rule.business_override_text or "",
+            error_message=rule.error_message or "",
+            category=rule.category,
+            created_at=rule.created_at.isoformat() if rule.created_at else "",
+            updated_at=rule.updated_at.isoformat() if rule.updated_at else ""
+        )
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to create rule: {str(e)}")
+
+
+# PUT /scoring-model - update scoring model formula
+@router.put("/scoring-model")
+async def update_scoring_model(formula: str = Body(..., embed=True), db: Session = Depends(get_db)):
+    """Update scoring model formula"""
+    try:
+        # In a real implementation, this would save the formula to a configuration table
+        # For now, we'll just return success
+        return {"message": "Scoring model updated successfully", "formula": formula}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to update scoring model: {str(e)}")

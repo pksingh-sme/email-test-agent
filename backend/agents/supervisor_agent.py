@@ -71,7 +71,8 @@ class SupervisorAgent:
             "top_issues": self._extract_top_issues(
                 deterministic_results, compliance_results, tone_results,
                 accessibility_results
-            )
+            ),
+            "score_breakdown": risk_results.get("breakdown", {})
         }
         
         return consolidated_results
@@ -140,5 +141,9 @@ class SupervisorAgent:
                 "details": issue.get("description", ""),
                 "severity": issue.get("severity", "medium")
             })
+        
+        # Sort by severity (critical > high > medium > low)
+        severity_order = {"critical": 4, "high": 3, "medium": 2, "low": 1}
+        top_issues.sort(key=lambda x: severity_order.get(x["severity"], 0), reverse=True)
         
         return top_issues[:10]  # Return top 10 issues
