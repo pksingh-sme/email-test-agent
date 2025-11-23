@@ -3,9 +3,13 @@ from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 from api.endpoints import router as api_router
 import os
+from database import init_db
 
 # Create uploads directory if it doesn't exist
 os.makedirs("uploads", exist_ok=True)
+
+# Initialize database
+init_db.init_db()
 
 app = FastAPI(title="Email QA Agentic Platform", version="1.0.0")
 
