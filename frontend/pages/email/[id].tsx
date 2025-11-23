@@ -1,7 +1,7 @@
 import { useRouter } from 'next/router';
 import { useState, useEffect } from 'react';
-import axios from 'axios';
 import HtmlPreview from '../../components/HtmlPreview';
+import { apiClient } from '../../lib/api';
 
 interface EmailDetails {
   id: string;
@@ -57,21 +57,8 @@ export default function EmailDetail() {
     try {
       setLoading(true);
       // In a real implementation, this would call your backend API
-      // const response = await axios.get(`/api/v1/emails/${id}`);
-      // setEmailDetails(response.data);
-      
-      // Mock data for demonstration
-      setEmailDetails({
-        id: id as string,
-        html_content: '<html><body><h1>Welcome to Our Service</h1><p>Thank you for joining us. We\'re excited to have you on board!</p><img src="https://example.com/logo.png" alt="Company Logo"></body></html>',
-        metadata: {
-          subject: 'Welcome to Our Service',
-          preheader: 'Thank you for joining us',
-          template_name: 'Welcome Email',
-          locale: 'en-US',
-          created_at: '2023-01-01T12:00:00Z'
-        }
-      });
+      const response = await apiClient.getEmailDetails(id as string);
+      setEmailDetails(response);
       
       // Also fetch analysis if available
       fetchAnalysis();
@@ -81,8 +68,7 @@ export default function EmailDetail() {
     } finally {
       setLoading(false);
     }
-  };
-  const fetchAnalysis = async () => {
+  };  const fetchAnalysis = async () => {
     try {
       // In a real implementation, this would call your backend API
       // const response = await axios.post(`/api/v1/emails/${id}/qa`);
@@ -130,14 +116,14 @@ export default function EmailDetail() {
     try {
       setRunningQA(true);
       // In a real implementation, this would call your backend API
-      // const response = await axios.post(`/api/v1/emails/${id}/qa`, { email_id: id });
-      // setAnalysis(response.data.report);
+      const response = await apiClient.runQA(id as string);
+      setAnalysis(response.report);
       
       // Mock delay for demonstration
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // await new Promise(resolve => setTimeout(resolve, 1500));
       
       // Use existing mock data
-      fetchAnalysis();
+      // fetchAnalysis();
     } catch (err) {
       setError('Failed to run QA analysis');
       console.error(err);
@@ -145,7 +131,6 @@ export default function EmailDetail() {
       setRunningQA(false);
     }
   };
-
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'pass': return 'bg-green-100 text-green-800';

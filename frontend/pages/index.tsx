@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import axios from 'axios';
 import TestResultCard from '../components/TestResultCard';
+import { apiClient } from '../lib/api';
 
 interface EmailTemplate {
   id: string;
@@ -25,30 +25,30 @@ export default function Home() {
     try {
       setLoading(true);
       // In a real implementation, this would call your backend API
-      // const response = await axios.get('/api/v1/emails');
-      // setTemplates(response.data);
+      const response = await apiClient.getEmails();
+      setTemplates(response);
       
       // Mock data for demonstration
-      setTemplates([
-        {
-          id: 'template-1',
-          name: 'Welcome Email',
-          created_at: '2023-01-01T12:00:00Z',
-          status: 'pass'
-        },
-        {
-          id: 'template-2',
-          name: 'Promotional Email',
-          created_at: '2023-01-02T14:30:00Z',
-          status: 'fail'
-        },
-        {
-          id: 'template-3',
-          name: 'Newsletter',
-          created_at: '2023-01-03T09:15:00Z',
-          status: 'needs_review'
-        }
-      ]);
+      // setTemplates([
+      //   {
+      //     id: 'template-1',
+      //     name: 'Welcome Email',
+      //     created_at: '2023-01-01T12:00:00Z',
+      //     status: 'pass'
+      //   },
+      //   {
+      //     id: 'template-2',
+      //     name: 'Promotional Email',
+      //     created_at: '2023-01-02T14:30:00Z',
+      //     status: 'fail'
+      //   },
+      //   {
+      //     id: 'template-3',
+      //     name: 'Newsletter',
+      //     created_at: '2023-01-03T09:15:00Z',
+      //     status: 'needs_review'
+      //   }
+      // ]);
     } catch (err) {
       setError('Failed to fetch email templates');
       console.error(err);
@@ -56,7 +56,6 @@ export default function Home() {
       setLoading(false);
     }
   };
-
   const handleViewReport = (templateId: string) => {
     // Navigate to the detail page
     window.location.href = `/email/${templateId}`;
@@ -68,18 +67,12 @@ export default function Home() {
 
     try {
       setUploading(true);
-      const formData = new FormData();
-      formData.append('file', file);
 
       // Upload file to backend
-      const response = await axios.post('/api/v1/upload', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
+      const response = await apiClient.uploadHTML(file);
 
       // Set the result to display
-      setUploadResult(response.data.report);
+      setUploadResult(response.report);
       
       // Clear the file input
       if (fileInputRef.current) {
@@ -92,7 +85,6 @@ export default function Home() {
       setUploading(false);
     }
   };
-
   const triggerFileInput = () => {
     if (fileInputRef.current) {
       fileInputRef.current.click();
