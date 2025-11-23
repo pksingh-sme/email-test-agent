@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from 'react';
-import TestResultCard from '../components/TestResultCard';
 import { apiClient } from '../lib/api';
 
 interface EmailTemplate {
@@ -7,48 +6,43 @@ interface EmailTemplate {
   name: string;
   created_at: string;
   status: string;
+  locale?: string;
+  risk_score?: number;
 }
 
 export default function Home() {
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
+  const [filteredTemplates, setFilteredTemplates] = useState<EmailTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadResult, setUploadResult] = useState<any>(null);
+  const [searchTerm, setSearchTerm] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetchEmailTemplates();
   }, []);
 
+  useEffect(() => {
+    // Filter templates based on search term
+    if (searchTerm) {
+      const filtered = templates.filter(template => 
+        template.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (template.locale && template.locale.toLowerCase().includes(searchTerm.toLowerCase()))
+      );
+      setFilteredTemplates(filtered);
+    } else {
+      setFilteredTemplates(templates);
+    }
+  }, [searchTerm, templates]);
+
   const fetchEmailTemplates = async () => {
     try {
       setLoading(true);
-      // In a real implementation, this would call your backend API
       const response = await apiClient.getEmails();
       setTemplates(response);
-      
-      // Mock data for demonstration
-      // setTemplates([
-      //   {
-      //     id: 'template-1',
-      //     name: 'Welcome Email',
-      //     created_at: '2023-01-01T12:00:00Z',
-      //     status: 'pass'
-      //   },
-      //   {
-      //     id: 'template-2',
-      //     name: 'Promotional Email',
-      //     created_at: '2023-01-02T14:30:00Z',
-      //     status: 'fail'
-      //   },
-      //   {
-      //     id: 'template-3',
-      //     name: 'Newsletter',
-      //     created_at: '2023-01-03T09:15:00Z',
-      //     status: 'needs_review'
-      //   }
-      // ]);
+      setFilteredTemplates(response);
     } catch (err) {
       setError('Failed to fetch email templates');
       console.error(err);
@@ -56,6 +50,7 @@ export default function Home() {
       setLoading(false);
     }
   };
+
   const handleViewReport = (templateId: string) => {
     // Navigate to the detail page
     window.location.href = `/email/${templateId}`;
@@ -74,6 +69,9 @@ export default function Home() {
       // Set the result to display
       setUploadResult(response.report);
       
+      // Refresh the template list
+      fetchEmailTemplates();
+      
       // Clear the file input
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
@@ -85,10 +83,26 @@ export default function Home() {
       setUploading(false);
     }
   };
+
   const triggerFileInput = () => {
     if (fileInputRef.current) {
       fileInputRef.current.click();
     }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'pass': return 'bg-green-100 text-green-800';
+      case 'fail': return 'bg-red-100 text-red-800';
+      case 'needs_review': return 'bg-yellow-100 text-yellow-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getScoreColor = (score: number) => {
+    if (score >= 85) return 'text-green-600';
+    if (score >= 60) return 'text-yellow-600';
+    return 'text-red-600';
   };
 
   if (loading) {
@@ -113,10 +127,34 @@ export default function Home() {
         <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
           <h1 className="text-3xl font-bold text-gray-900">Email QA Dashboard</h1>
         </div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex space-x-4">
+            <a href="/" className="text-blue-600 hover:text-blue-800 font-medium">
+              Dashboard
+            </a>
+            <a href="/admin" className="text-gray-500 hover:text-gray-700 font-medium">
+              Admin Panel
+            </a>
+          </div>
+        </div>
       </header>
       <main>
         <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
           <div className="px-4 py-6 sm:px-0">
+            {/* Search Bar */}
+            <div className="mb-6">
+              <div className="relative rounded-md shadow-sm">
+                <input
+                  type="text"
+                  className="block w-full pl-3 pr-10 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  placeholder="Enter email name or locale..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+            </div>
+
+            {/* Action Buttons */}
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-2xl font-semibold text-gray-800">Email Templates</h2>
               <div className="flex space-x-2">
@@ -179,19 +217,77 @@ export default function Home() {
               </div>
             )}
             
-            {templates.length === 0 ? (
+            {/* Templates Table */}
+            {filteredTemplates.length === 0 ? (
               <div className="text-center py-12">
                 <p className="text-gray-500">No email templates found</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                {templates.map((template) => (
-                  <TestResultCard
-                    key={template.id}
-                    template={template}
-                    onViewReport={handleViewReport}
-                  />
-                ))}
+              <div className="bg-white shadow overflow-hidden sm:rounded-lg">
+                <div className="px-4 py-5 sm:px-6">
+                  <h3 className="text-lg leading-6 font-medium text-gray-900">Email Templates</h3>
+                </div>
+                <div className="border-t border-gray-200">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Template Name
+                        </th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Locale
+                        </th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Status
+                        </th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          QA Score
+                        </th>
+                        <th scope="col" className="relative px-6 py-3">
+                          <span className="sr-only">Actions</span>
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {filteredTemplates.map((template) => (
+                        <tr key={template.id}>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            {template.name}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {template.locale || 'N/A'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(template.status)}`}>
+                              {template.status.replace('_', ' ')}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <span className={getScoreColor(template.risk_score || 0)}>
+                              {(template.risk_score || 0)}/100
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <button
+                              onClick={() => handleViewReport(template.id)}
+                              className="text-blue-600 hover:text-blue-900"
+                            >
+                              View Report
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="bg-gray-50 px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
+                  <div className="text-sm text-gray-700">
+                    Showing <span className="font-medium">{filteredTemplates.length}</span> of <span className="font-medium">{templates.length}</span> templates
+                  </div>
+                  <div className="text-sm text-gray-700">
+                    Legend: PASS &ge; 85 | NEED REVIEW 60&ndash;85 | FAIL &lt; 60
+                  </div>
+                </div>
               </div>
             )}
           </div>
