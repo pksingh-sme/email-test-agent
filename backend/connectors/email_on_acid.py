@@ -33,21 +33,8 @@ class EmailOnAcidConnector:
         # In a real implementation, this would call the Email on Acid API
         # to fetch the list of email proofs
         
-        # Example response structure
-        return [
-            {
-                "id": "email-123",
-                "name": "Welcome Email",
-                "created_at": "2023-01-01T12:00:00Z",
-                "status": "completed"
-            },
-            {
-                "id": "email-456",
-                "name": "Promotional Email",
-                "created_at": "2023-01-02T14:30:00Z",
-                "status": "completed"
-            }
-        ]
+        # Return empty list when no credentials are available
+        return []
     
     def get_email_details(self, email_id: str) -> Dict[str, Any]:
         """
@@ -63,24 +50,18 @@ class EmailOnAcidConnector:
         # In a real implementation, this would call the Email on Acid API
         # to fetch the HTML content and metadata for a specific email
         
-        # Example response structure
+        # Return empty response when no credentials are available
         return {
             "id": email_id,
-            "html_content": "<html><body><h1>Sample Email</h1><p>This is a sample email content.</p></body></html>",
+            "html_content": "",
             "metadata": {
-                "subject": "Sample Email Subject",
-                "preheader": "Sample preheader text",
-                "template_name": "Sample Template",
+                "subject": "",
+                "preheader": "",
+                "template_name": "",
                 "locale": "en-US",
-                "created_at": "2023-01-01T12:00:00Z"
+                "created_at": ""
             },
-            "assets": [
-                {
-                    "type": "image",
-                    "url": "https://example.com/image.jpg",
-                    "alt": "Sample image"
-                }
-            ]
+            "assets": []
         }
     
     def _make_api_request(self, endpoint: str, method: str = "GET", data: Dict = None) -> Dict[str, Any]:
