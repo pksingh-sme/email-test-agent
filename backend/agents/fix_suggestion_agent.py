@@ -25,7 +25,7 @@ class FixSuggestionAgent:
             "logo_placement": "Add brand logo to header: {expected_logo}",
             "header_consistency": "Ensure consistent header structure",
             "footer_consistency": "Ensure consistent footer structure",
-            "spam_indicators": "Remove or rephrase spammy language: {spam_text}",
+            "broken_links": "Verify and fix broken link: {url}",
             "complex_sentences": "Simplify complex sentence structure",
             "clarity": "Rewrite passive voice to active voice",
             "grammar": "Fix grammar issue: {grammar_issue}",

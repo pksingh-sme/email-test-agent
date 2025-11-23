@@ -60,11 +60,52 @@ def check_links(html_content: str) -> List[Dict[str, Any]]:
                 "details": f"Malformed link: {href}"
             })
         else:
-            issues.append({
-                "test_name": "links",
-                "status": "pass",
-                "details": f"Valid link: {href}"
-            })
+            # For HTTP/HTTPS links, perform additional checks
+            if href.startswith(('http://', 'https://')):
+                # Check for common patterns that indicate potential issues
+                problems = []
+                
+                # Check for excessive parameters (often indicates tracking links that might break)
+                if href.count('&') > 10:
+                    problems.append("excessive parameters")
+                
+                # Check for common broken link patterns
+                if "example.com" in href or "localhost" in href:
+                    problems.append("placeholder domain")
+                
+                # Check for malformed query parameters
+                if href.count('&&') > 0 or href.count('?&') > 0 or href.endswith('?') or href.endswith('&'):
+                    problems.append("malformed query parameters")
+                
+                # Check for unencoded special characters
+                import urllib.parse
+                try:
+                    parsed = urllib.parse.urlparse(href)
+                    # Check if URL can be properly parsed
+                    if not parsed.scheme or not parsed.netloc:
+                        problems.append("invalid URL structure")
+                except Exception:
+                    problems.append("URL parsing failed")
+                
+                if problems:
+                    issues.append({
+                        "test_name": "broken_links",
+                        "status": "fail",
+                        "details": f"Potentially broken link: {href} (issues: {', '.join(problems)})"
+                    })
+                else:
+                    issues.append({
+                        "test_name": "links",
+                        "status": "pass",
+                        "details": f"Valid link format: {href}"
+                    })
+            else:
+                # For mailto and anchor links, just mark as pass
+                issues.append({
+                    "test_name": "links",
+                    "status": "pass",
+                    "details": f"Valid link: {href}"
+                })
     
     if not issues:
         issues.append({
