@@ -112,12 +112,16 @@ async def run_qa(email_id: str, request: QARequest, db: Session = Depends(get_db
         )
         
         # Save QA report to database
+        # Convert report to JSON-serializable format
+        import json
+        serializable_report = json.loads(json.dumps(report, default=str))
+        
         existing_report = db.query(QAReport).filter(QAReport.id == email_id).first()
         if existing_report:
             # Update existing report
             existing_report.overall_status = report.get("overall_status", "unknown")
             existing_report.risk_score = report.get("risk_score", 0)
-            existing_report.report_data = report
+            existing_report.report_data = serializable_report
         else:
             # Create new report
             qa_report = QAReport(
@@ -125,7 +129,7 @@ async def run_qa(email_id: str, request: QARequest, db: Session = Depends(get_db
                 email_template_id=email_id,
                 overall_status=report.get("overall_status", "unknown"),
                 risk_score=report.get("risk_score", 0),
-                report_data=report,
+                report_data=serializable_report,
                 is_uploaded=False  # Assuming this is from Email on Acid
             )
             db.add(qa_report)
@@ -147,13 +151,19 @@ async def get_report(report_id: str, db: Session = Depends(get_db)):
         # Try to get report from database
         report = db.query(QAReport).filter(QAReport.id == report_id).first()
         if report:
+            # Handle the case where report_data might be a string or dict
+            report_data = report.report_data
+            if isinstance(report_data, str):
+                import json
+                report_data = json.loads(report_data)
+            
             return {
                 "report_id": report.id,
                 "email_template_id": report.email_template_id,
                 "created_at": report.created_at.isoformat() if report.created_at else "",
                 "overall_status": report.overall_status,
                 "risk_score": report.risk_score,
-                "report_data": report.report_data
+                "report_data": report_data
             }
         
         # If not found in database, return placeholder
@@ -224,12 +234,16 @@ async def upload_email_html(file: UploadFile = File(...), db: Session = Depends(
         db.add(upload_record)
         
         # Save QA report
+        # Convert report to JSON-serializable format
+        import json
+        serializable_report = json.loads(json.dumps(report, default=str))
+        
         qa_report = QAReport(
             id=file_id,
             email_template_id=file_id,
             overall_status=report.get("overall_status", "unknown"),
             risk_score=report.get("risk_score", 0),
-            report_data=report,
+            report_data=serializable_report,  # PostgreSQL supports JSON natively
             is_uploaded=True
         )
         db.add(qa_report)
