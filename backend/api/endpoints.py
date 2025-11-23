@@ -2,9 +2,12 @@
 API Endpoints for the Email QA Agentic Platform
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, UploadFile, File
+from fastapi.responses import HTMLResponse
 from typing import List, Dict, Any
 from pydantic import BaseModel
+import os
+import uuid
 from connectors.email_on_acid import EmailOnAcidConnector
 from agent_orchestrator import AgentOrchestrator
 
@@ -91,3 +94,83 @@ async def get_report(report_id: str):
         "status": "placeholder",
         "message": "Report fetching not implemented in this placeholder"
     }
+
+
+# POST /upload - upload HTML file for QA analysis
+@router.post("/upload")
+async def upload_email_html(file: UploadFile = File(...)):
+    """Upload HTML file for QA analysis"""
+    if not agent_orchestrator:
+        raise HTTPException(status_code=500, detail="Agent orchestrator not initialized")
+    
+    try:
+        # Create uploads directory if it doesn't exist
+        upload_dir = "uploads"
+        os.makedirs(upload_dir, exist_ok=True)
+        
+        # Generate unique filename
+        file_id = str(uuid.uuid4())
+        file_path = os.path.join(upload_dir, f"{file_id}.html")
+        
+        # Save uploaded file
+        with open(file_path, "wb") as buffer:
+            content = await file.read()
+            buffer.write(content)
+        
+        # Extract HTML content and basic metadata
+        html_content = content.decode('utf-8')
+        metadata = {
+            "subject": "Uploaded Email",
+            "preheader": "Uploaded HTML file for QA analysis",
+            "template_name": file.filename or "Uploaded Email",
+            "locale": "en-US"
+        }
+        
+        # Run QA process
+        report = agent_orchestrator.run_qa_process(
+            file_id,
+            html_content,
+            metadata
+        )
+        
+        # Clean up uploaded file
+        os.remove(file_path)
+        
+        return {"report": report}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to process uploaded file: {str(e)}")
+
+
+# GET /upload - show upload form
+@router.get("/upload", response_class=HTMLResponse)
+async def upload_form():
+    """Show HTML upload form"""
+    return """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Email QA Upload</title>
+        <style>
+            body { font-family: Arial, sans-serif; margin: 40px; }
+            .container { max-width: 600px; margin: 0 auto; }
+            .form-group { margin-bottom: 20px; }
+            label { display: block; margin-bottom: 5px; font-weight: bold; }
+            input[type="file"] { display: block; margin-bottom: 10px; }
+            button { background-color: #0085FF; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; }
+            button:hover { background-color: #0066cc; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>Upload Email HTML for QA Analysis</h1>
+            <form action="/api/v1/upload" method="post" enctype="multipart/form-data">
+                <div class="form-group">
+                    <label for="file">Select HTML File:</label>
+                    <input type="file" name="file" accept=".html,.htm" required>
+                </div>
+                <button type="submit">Upload and Analyze</button>
+            </form>
+        </div>
+    </body>
+    </html>
+    """

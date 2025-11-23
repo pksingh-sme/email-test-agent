@@ -82,7 +82,6 @@ export default function EmailDetail() {
       setLoading(false);
     }
   };
-
   const fetchAnalysis = async () => {
     try {
       // In a real implementation, this would call your backend API
