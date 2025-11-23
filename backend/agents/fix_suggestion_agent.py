@@ -18,7 +18,7 @@ class FixSuggestionAgent:
             "width": "Specify width attributes for email elements",
             "background_color": "Define background colors for all sections",
             "image_dimensions": "Add width and height attributes to image: {element}",
-            "long_copy": "Break up long text block into shorter paragraphs",
+            "long_copy": "Break up long text block into shorter paragraphs (aim for <150 characters per line)",
             "font_compliance": "Update font family to brand standard: {expected_font}",
             "cta_color_compliance": "Update CTA button color to brand standard: {expected_color}",
             "spacing_compliance": "Adjust spacing to brand guidelines: {spacing_rule}",

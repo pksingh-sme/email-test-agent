@@ -231,20 +231,30 @@ def check_long_copy(html_content: str) -> List[Dict[str, Any]]:
     text_elements = soup.find_all(string=True)
     
     issues = []
-    for text in text_elements:
+    for i, text in enumerate(text_elements):
         # Skip whitespace-only text
         if text.strip() and len(text.strip()) > 200:
+            # Try to get context by finding the parent element
+            parent_context = ""
+            try:
+                # Get a snippet of the surrounding HTML
+                parent_element = text.parent
+                if parent_element:
+                    parent_context = str(parent_element)[:100] + "..." if len(str(parent_element)) > 100 else str(parent_element)
+            except:
+                pass
+            
             issues.append({
                 "test_name": "long_copy",
                 "status": "fail",
-                "details": f"Long text line found ({len(text.strip())} chars)"
+                "details": f"Long text line found ({len(text.strip())} chars). Consider breaking into shorter paragraphs (<150 chars). Context: {parent_context}"
             })
     
     if not issues:
         issues.append({
             "test_name": "long_copy",
             "status": "pass",
-            "details": "No excessively long text lines found"
+            "details": "No excessively long text lines found (all <200 characters)"
         })
     
     return issues
