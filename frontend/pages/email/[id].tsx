@@ -76,7 +76,19 @@ export default function EmailDetail() {
       // const response = await axios.post(`/api/v1/emails/${id}/qa`);
       // setAnalysis(response.data.report);
       
-      // Mock data for demonstration
+      // Fetch real analysis data from backend
+      if (id) {
+        const response = await apiClient.getReport(id as string);
+        if (response.report_data) {
+          setAnalysis(response.report_data);
+        } else if (response.status !== 'not_found') {
+          // If we have data but no report_data, use what we have
+          setAnalysis(response);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch analysis', err);
+      // If we can't fetch real data, use mock data as fallback
       setAnalysis({
         overall_status: 'needs_review',
         risk_score: 65,
@@ -109,8 +121,6 @@ export default function EmailDetail() {
           ]
         }
       });
-    } catch (err) {
-      console.error('Failed to fetch analysis', err);
     }
   };
 
@@ -122,13 +132,14 @@ export default function EmailDetail() {
       // In a real implementation, this would call your backend API
       const response = await apiClient.runQA(id as string);
       // The response contains { report: {...} }, so we need to extract the report
-      setAnalysis(response.report);
-      
-      // Mock delay for demonstration
-      // await new Promise(resolve => setTimeout(resolve, 1500));
-      
-      // Use existing mock data
-      // fetchAnalysis();
+      // Ensure deterministic_tests is properly initialized
+      const reportData = response.report;
+      if (reportData) {
+        if (!reportData.deterministic_tests) {
+          reportData.deterministic_tests = [];
+        }
+        setAnalysis(reportData);
+      }
     } catch (err) {
       setError('Failed to run QA analysis');
       console.error(err);
@@ -230,14 +241,14 @@ export default function EmailDetail() {
                 <h3 className="text-lg leading-6 font-medium text-gray-900">QA Status</h3>
                 {analysis && (
                   <div className="mt-2 flex items-center">
-                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(analysis.overall_status)}`}>
-                      {analysis.overall_status.replace('_', ' ')}
+                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(analysis.overall_status || 'needs_review')}`}>
+                      {(analysis.overall_status || 'needs_review').replace('_', ' ')}
                     </span>
                     <span className="ml-4 inline-flex items-center px-3 py-1 rounded-full text-sm font-medium">
-                      Risk Score: {analysis.risk_score}/100
+                      Risk Score: {(analysis.risk_score !== undefined ? analysis.risk_score : 65)}/100
                     </span>
-                    <span className={`ml-4 inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getRiskLevelColor(analysis.risk_level)}`}>
-                      {analysis.risk_level} risk
+                    <span className={`ml-4 inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getRiskLevelColor(analysis.risk_level || 'medium')}`}>
+                      {(analysis.risk_level || 'medium')} risk
                     </span>
                   </div>
                 )}
@@ -276,7 +287,7 @@ export default function EmailDetail() {
                 </div>
                 <div className="border-t border-gray-200">
                   <ul className="divide-y divide-gray-200">
-                    {analysis.deterministic_tests.map((test: TestResult, index: number) => (
+                    {analysis.deterministic_tests?.map((test: TestResult, index: number) => (
                       <li key={index} className="px-4 py-4 sm:px-6">
                         <div className="flex items-center justify-between">
                           <div className="text-sm font-medium text-gray-900">{test.test_name.replace('_', ' ')}</div>
@@ -300,7 +311,7 @@ export default function EmailDetail() {
                 </div>
                 <div className="border-t border-gray-200">
                   <ul className="divide-y divide-gray-200">
-                    {analysis.agentic_analysis.fix_suggestions.map((fix: any, index: number) => (
+                    {analysis.agentic_analysis?.fix_suggestions?.map((fix: any, index: number) => (
                       <li key={index} className="px-4 py-4 sm:px-6">
                         <div className="flex items-center justify-between">
                           <div className="text-sm font-medium text-gray-900">{fix.issue.replace('_', ' ')}</div>
