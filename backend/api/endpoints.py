@@ -8,6 +8,7 @@ from typing import List, Dict, Any
 from pydantic import BaseModel
 import os
 import uuid
+import json
 from connectors.email_on_acid import EmailOnAcidConnector
 from agent_orchestrator import AgentOrchestrator
 from database.config import get_db
@@ -113,8 +114,16 @@ async def run_qa(email_id: str, request: QARequest, db: Session = Depends(get_db
         
         # Save QA report to database
         # Convert report to JSON-serializable format
-        import json
-        serializable_report = json.loads(json.dumps(report, default=str))
+        try:
+            serializable_report = json.loads(json.dumps(report, default=str))
+        except Exception as serialize_error:
+            # If serialization fails, create a simplified version
+            serializable_report = {
+                "overall_status": report.get("overall_status", "unknown"),
+                "risk_score": report.get("risk_score", 0),
+                "email_id": report.get("email_id", email_id),
+                "message": "Full report could not be serialized"
+            }
         
         existing_report = db.query(QAReport).filter(QAReport.id == email_id).first()
         if existing_report:
@@ -235,8 +244,16 @@ async def upload_email_html(file: UploadFile = File(...), db: Session = Depends(
         
         # Save QA report
         # Convert report to JSON-serializable format
-        import json
-        serializable_report = json.loads(json.dumps(report, default=str))
+        try:
+            serializable_report = json.loads(json.dumps(report, default=str))
+        except Exception as serialize_error:
+            # If serialization fails, create a simplified version
+            serializable_report = {
+                "overall_status": report.get("overall_status", "unknown"),
+                "risk_score": report.get("risk_score", 0),
+                "email_id": report.get("email_id", file_id),
+                "message": "Full report could not be serialized"
+            }
         
         qa_report = QAReport(
             id=file_id,
