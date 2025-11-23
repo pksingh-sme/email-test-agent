@@ -87,11 +87,24 @@ class FixSuggestionAgent:
         test_name = test_result["test_name"]
         template = self.fix_templates.get(test_name, "Fix {test_name} issue")
         
+        # Create a safe copy of test_result with default values for missing keys
+        safe_test_result = test_result.copy()
+        safe_test_result.setdefault("element", "element")
+        safe_test_result.setdefault("url", "link")
+        safe_test_result.setdefault("missing_field", "field")
+        safe_test_result.setdefault("expected_font", "Arial")
+        safe_test_result.setdefault("expected_color", "#0085FF")
+        safe_test_result.setdefault("spacing_rule", "padding")
+        safe_test_result.setdefault("expected_logo", "logo")
+        safe_test_result.setdefault("spam_text", "text")
+        safe_test_result.setdefault("grammar_issue", "issue")
+        safe_test_result.setdefault("current_text", "text")
+        
         return {
             "type": "deterministic",
             "issue": test_name,
             "description": test_result["details"],
-            "suggestion": template.format(**test_result),
+            "suggestion": template.format(**safe_test_result),
             "priority": "high"
         }
     
@@ -100,11 +113,25 @@ class FixSuggestionAgent:
         rule = issue.get("rule", "compliance")
         template = self.fix_templates.get(rule, "Fix compliance issue: {description}")
         
+        # Create a safe copy of issue with default values for missing keys
+        safe_issue = issue.copy()
+        safe_issue.setdefault("element", "element")
+        safe_issue.setdefault("url", "link")
+        safe_issue.setdefault("missing_field", "field")
+        safe_issue.setdefault("expected_font", "Arial")
+        safe_issue.setdefault("expected_color", "#0085FF")
+        safe_issue.setdefault("spacing_rule", "padding")
+        safe_issue.setdefault("expected_logo", "logo")
+        safe_issue.setdefault("spam_text", "text")
+        safe_issue.setdefault("grammar_issue", "issue")
+        safe_issue.setdefault("current_text", "text")
+        safe_issue.setdefault("description", "issue")
+        
         return {
             "type": "compliance",
             "issue": rule,
             "description": issue.get("description", ""),
-            "suggestion": template.format(**issue),
+            "suggestion": template.format(**safe_issue),
             "priority": issue.get("severity", "medium")
         }
     
@@ -113,11 +140,25 @@ class FixSuggestionAgent:
         rule = issue.get("rule", "tone")
         template = self.fix_templates.get(rule, "Improve tone/clarity: {description}")
         
+        # Create a safe copy of issue with default values for missing keys
+        safe_issue = issue.copy()
+        safe_issue.setdefault("element", "element")
+        safe_issue.setdefault("url", "link")
+        safe_issue.setdefault("missing_field", "field")
+        safe_issue.setdefault("expected_font", "Arial")
+        safe_issue.setdefault("expected_color", "#0085FF")
+        safe_issue.setdefault("spacing_rule", "padding")
+        safe_issue.setdefault("expected_logo", "logo")
+        safe_issue.setdefault("spam_text", "text")
+        safe_issue.setdefault("grammar_issue", "issue")
+        safe_issue.setdefault("current_text", "text")
+        safe_issue.setdefault("description", "issue")
+        
         return {
             "type": "tone",
             "issue": rule,
             "description": issue.get("description", ""),
-            "suggestion": template.format(**issue),
+            "suggestion": template.format(**safe_issue),
             "priority": issue.get("severity", "medium")
         }
     
@@ -126,11 +167,25 @@ class FixSuggestionAgent:
         rule = issue.get("rule", "accessibility")
         template = self.fix_templates.get(rule, "Improve accessibility: {description}")
         
+        # Create a safe copy of issue with default values for missing keys
+        safe_issue = issue.copy()
+        safe_issue.setdefault("element", "element")
+        safe_issue.setdefault("url", "link")
+        safe_issue.setdefault("missing_field", "field")
+        safe_issue.setdefault("expected_font", "Arial")
+        safe_issue.setdefault("expected_color", "#0085FF")
+        safe_issue.setdefault("spacing_rule", "padding")
+        safe_issue.setdefault("expected_logo", "logo")
+        safe_issue.setdefault("spam_text", "text")
+        safe_issue.setdefault("grammar_issue", "issue")
+        safe_issue.setdefault("current_text", "text")
+        safe_issue.setdefault("description", "issue")
+        
         return {
             "type": "accessibility",
             "issue": rule,
             "description": issue.get("description", ""),
-            "suggestion": template.format(**issue),
+            "suggestion": template.format(**safe_issue),
             "priority": issue.get("severity", "medium")
         }
     
